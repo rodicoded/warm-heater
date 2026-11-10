@@ -2,7 +2,7 @@
   "name": "Warm Heater Sound Generator",
   "short_name": "Warm Heater",
   "description": "Fan-heater sound synthesizer and ambient noise generator.",
-  "start_url": "./Sound_Generator.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#101412",
   "theme_color": "#1b2420",
