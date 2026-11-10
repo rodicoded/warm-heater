@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Warm Heater Sound Prototype</title>
+	
+	<!-- Collegamento al Manifest -->
+	<link rel="manifest" href="manifest.json">
+	<meta name="theme-color" content="#1b2420">
+    
+    <!-- ========================================== -->
+    <!-- STILI CSS                                  -->
+    <!-- ========================================== -->
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #101412; color: #ecf5ef; font: 16px system-ui, sans-serif; }
+      main { width: min(520px, calc(100% - 40px)); background: #1b2420; border: 1px solid #34463c; border-radius: 24px; padding: 28px; box-shadow: 0 20px 80px #0005; }
+      h1 { margin: 0 0 6px; font-size: 26px; }
+      p { color: #b2c4ba; line-height: 1.5; }
+      .description { margin-bottom: 25px; }
+      .big { width: 100%; font: 700 18px system-ui; border: 0; border-radius: 12px; padding: 18px; background: #a9d7ae; color: #152119; cursor: pointer; }
+      .big.active { background: #e7c69b; }
+      label { display: flex; justify-content: space-between; margin: 24px 0 10px; font-size: 14px; }
+      input { width: 100%; accent-color: #a9d7ae; }
+      small { color: #aebdb4; }
+      #status { text-align: center; min-height: 24px; font-size: 14px; margin: 16px 0; }
+      canvas { display: block; width: 100%; height: 100px; background: #111915; border-radius: 12px; margin: 22px 0 8px; }
+      .export { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 12px; }
+      .export button { flex: 1; min-width: 150px; background: #293c32; border: 1px solid #678570; border-radius: 9px; color: #e6f5e9; padding: 12px; cursor: pointer; font: 600 14px system-ui; }
+      .export button:disabled { opacity: .45; cursor: wait; }
+      #exportStatus { min-height: 18px; font-size: 13px; color: #b2c4ba; }
+      .modulation { border: 1px solid #3c5848; background: #15201a; border-radius: 12px; padding: 14px 16px; margin: 13px 0 4px; }
+      .modulation .checkrow { display: flex; align-items: center; justify-content: flex-start; gap: 12px; margin: 0; font-size: 14px; cursor: pointer; }
+      .modulation input[type=checkbox] { width: 19px; height: 19px; flex: none; cursor: pointer; }
+      .modulation .hint { color: #aebdb4; font-size: 12px; line-height: 1.5; margin: 10px 0 0; }
+      .modulation .periodRow { display: flex; justify-content: space-between; font-size: 13px; margin: 14px 0 9px; }
+      .modulation input[type=range] { margin: 0; }
+      .modulation.inactive .periodControls { opacity: .45; }
+      .modulation input:disabled { cursor: not-allowed; }
+      .modeRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 13px; }
+      .randomBtn { background: #2a4032; color: #d9f6df; border: 1px solid #71947b; border-radius: 9px; padding: 9px 16px; cursor: pointer; font-weight: 700; }
+      .randomBtn.selected { background: #a9d7ae; color: #152119; }
+      .randomBtn:disabled { opacity: .4; cursor: not-allowed; }
+      .rangePair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 12px; }
+      .rangePair label { margin: 0 0 6px; font-size: 12px; color: #b2c4ba; }
+      .rangePair input { width: 100%; }
+      .preset { background: transparent; color: #dbece0; border: 1px solid #678570; border-radius: 8px; padding: 9px 13px; cursor: pointer; }
+    </style>
+  </head>
+  
+  <body>
+    <!-- ========================================== -->
+    <!-- INTERFACCIA UTENTE (HTML)                  -->
+    <!-- ========================================== -->
+    <main>
+      <h1>Warm Heater</h1>
+      <p class="description">Fan-heater sound synthesizer. A starting approximation of a small electric space heater: mellow airflow, motor rumble, soft hiss.</p>
+      
+      <!-- Visualizzatore grafico dell'onda -->
+      <canvas id="wave"></canvas>
+      
+      <!-- Pulsante di riproduzione principale e stato -->
+      <button class="big" id="play">▶ Play heater</button>
+      <div id="status">Click Play to enable audio</div>
+      
+      <!-- Controllo: Calore / morbidezza -->
+      <label for="warmth">Warmth / softness <output id="warmthVal">86%</output></label>
+      <input type="range" id="warmth" min="0" max="100" value="86">
+      
+      <!-- Pannello di modulazione per Calore -->
+      <div class="modulation inactive" id="warmthModBox">
+        <label class="checkrow" for="warmthOscillate">
+          <input type="checkbox" id="warmthOscillate">
+          <span><strong>Oscillate softness</strong></span>
+        </label>
+        <div class="rangePair">
+          <div>
+            <label for="warmthMin">Minimum <output id="warmthMinVal">70%</output></label>
+            <input type="range" id="warmthMin" min="0" max="100" value="70">
+          </div>
+          <div>
+            <label for="warmthMax">Maximum <output id="warmthMaxVal">100%</output></label>
+            <input type="range" id="warmthMax" min="0" max="100" value="100">
+          </div>
+        </div>
+        <div class="modeRow">
+          <span style="font-size:13px">Oscillation pattern</span>
+          <button type="button" class="randomBtn" id="warmthRandom" aria-pressed="false" disabled>Random: OFF</button>
+        </div>
+        <div class="periodControls">
+          <div class="periodRow">
+            <span>Full oscillation cycle</span>
+            <output id="warmthPeriodVal">12 seconds</output>
+          </div>
+          <input type="range" id="warmthPeriod" min="2" max="60" value="12" disabled>
+        </div>
+        <p class="hint" id="warmthHint">Enable to smoothly sweep softness between the minimum and maximum settings. Random uses 0–5s per transition.</p>
+      </div>
+      
+      <!-- Controllo: Flusso d'aria -->
+      <label for="fan">Airflow <output id="fanVal">75%</output></label>
+      <input type="range" id="fan" min="0" max="100" value="75">
+      
+      <!-- Controllo: Vibrazione/Runble del motore -->
+      <label for="hum">Motor hum <output id="humVal">84%</output></label>
+      <input type="range" id="hum" min="0" max="100" value="84">
+      
+      <!-- Pannello di modulazione per Motor Hum -->
+      <div class="modulation inactive" id="humModBox">
+        <label class="checkrow" for="humOscillate">
+          <input type="checkbox" id="humOscillate">
+          <span><strong>Oscillate motor hum</strong></span>
+        </label>
+        <div class="rangePair">
+          <div>
+            <label for="humMin">Minimum <output id="humMinVal">70%</output></label>
+            <input type="range" id="humMin" min="0" max="100" value="70">
+          </div>
+          <div>
+            <label for="humMax">Maximum <output id="humMaxVal">100%</output></label>
+            <input type="range" id="humMax" min="0" max="100" value="100">
+          </div>
+        </div>
+        <div class="modeRow">
+          <span style="font-size:13px">Oscillation pattern</span>
+          <button type="button" class="randomBtn" id="humRandom" aria-pressed="false" disabled>Random: OFF</button>
+        </div>
+        <div class="periodControls">
+          <div class="periodRow">
+            <span>Full oscillation cycle</span>
+            <output id="humPeriodVal">12 seconds</output>
+          </div>
+          <input type="range" id="humPeriod" min="2" max="60" value="12" disabled>
+        </div>
+        <p class="hint" id="humHint">Enable to smoothly sweep motor hum between the minimum and maximum settings. Random uses 0–5s per transition.</p>
+      </div>
+      
+      <!-- Controllo: Volume generale -->
+      <label for="volume">Output volume <output id="volumeVal">85%</output></label>
+      <input type="range" id="volume" min="0" max="100" value="85">
+      
+      <!-- Esportazione e Preset -->
+      <div class="export">
+        <button id="exportWav">↓ Export 30s WAV</button>
+      </div>
+      <div id="exportStatus" role="status">Exports the current slider settings (not a microphone recording).</div>
+      <p>
+        <button class="preset" id="reset">Reset to default preset</button>
+      </p>
+      <small>Approximation only. Matching the exact heater requires a recording. Start with a comfortable speaker volume.</small>
+    </main>
+
+    <!-- ========================================== -->
+    <!-- LOGICA E SINTESI AUDIO (JAVASCRIPT)        -->
+    <!-- ========================================== -->
+    <script>
+      const $ = id => document.getElementById(id);
+      let ctx, master, source, lowpass, highpass, airGain, humGain, humOsc, harmonic, harmGain, playing = false, raf;
+      const ids = ['warmth', 'fan', 'hum', 'volume'];
+      const mods = { warmth: { random: false, start: 0, segments: [] }, hum: { random: false, start: 0, segments: [] } };
+
+      // Generazione segmenti casuali per la modulazione Random (durata 0-5s per transizione)
+      function newRandomSegments(endTime) {
+        const segments = []; let t = 0, from = 0, to = 1;
+        while (t < endTime + 5) {
+          const duration = Math.max(.02, Math.random() * 5);
+          segments.push({ start: t, duration, from, to });
+          t += duration;
+          [from, to] = [to, from];
+        }
+        return segments;
+      }
+
+      function randomFraction(t, segments) {
+        if (!segments.length) return 0;
+        let lo = 0, hi = segments.length - 1;
+        while (lo < hi) {
+          const mid = (lo + hi + 1) >> 1;
+          if (segments[mid].start <= t) lo = mid;
+          else hi = mid - 1;
+        }
+        const s = segments[lo], x = Math.min(1, Math.max(0, (t - s.start) / s.duration));
+        return s.from + (s.to - s.from) * (.5 - .5 * Math.cos(Math.PI * x));
+      }
+
+      function modulationFraction(t, period, random, segments) {
+        return random ? randomFraction(t, segments) : (.5 - .5 * Math.cos(2 * Math.PI * t / period));
+      }
+
+      function restartOscillation(id) {
+        mods[id].start = ctx ? ctx.currentTime : 0;
+        mods[id].segments = newRandomSegments(3600);
+      }
+
+      // Sincronizzazione dell'interfaccia utente legata alle modulazioni
+      function syncModulationUi(id) {
+        const on = $(id + 'Oscillate').checked, m = mods[id];
+        $(id + 'Period').disabled = !on || m.random;
+        $(id + 'Random').disabled = !on;
+        $(id).disabled = on;
+        $(id + 'Random').classList.toggle('selected', on && m.random);
+        $(id + 'Random').textContent = m.random ? 'Random: ON' : 'Random: OFF';
+        $(id + 'Random').setAttribute('aria-pressed', String(on && m.random));
+        $(id + 'ModBox').classList.toggle('inactive', !on);
+        $(id + 'PeriodVal').textContent = m.random ? 'Random · 0–5s' : $(id + 'Period').value + ' seconds';
+        for (const edge of ['Min', 'Max']) $(id + edge + 'Val').value = $(id + edge).value + '%';
+        $(id + 'Hint').textContent = on ? (m.random ? 'Smooth random transitions lasting 0–5s each.' : 'Smooth repeating sweep: minimum → maximum → minimum.') + ' Both playback and WAV export use this range.' : 'Enable to smoothly sweep between your minimum and maximum values. Manual slider is paused when enabled.';
+        if (!on) $(id + 'Val').value = $(id).value + '%';
+      }
+
+      function currentValue(id, time) {
+        if (!$(id + 'Oscillate').checked) return +$(id).value / 100;
+        const m = mods[id], f = modulationFraction(Math.max(0, time - m.start), +$(id + 'Period').value, m.random, m.segments);
+        return (+$(id + 'Min').value + ((+$(id + 'Max').value) - (+$(id + 'Min').value)) * f) / 100;
+      }
+
+      function warmthCutoff(w) {
+        return 850 + Math.pow(1 - w, 1.45) * 4700;
+      }
+
+      // Aggiornamento dei parametri della catena audio in tempo reale
+      function update() {
+        ids.filter(id => id === 'fan' || id === 'volume').forEach(id => $(id + 'Val').value = $(id).value + '%');
+        for (const id of Object.keys(mods)) syncModulationUi(id);
+        if (!ctx) return;
+        const t = ctx.currentTime, w = currentValue('warmth', t), a = +$('fan').value / 100, v = +$('volume').value / 100, h = currentValue('hum', t);
+        lowpass.frequency.setTargetAtTime(warmthCutoff(w), t, .035);
+        highpass.frequency.setTargetAtTime(65, t, .08);
+        airGain.gain.setTargetAtTime(.34 * a, t, .06);
+        humGain.gain.setTargetAtTime(.11 * h, t, .025);
+        harmGain.gain.setTargetAtTime(.023 * h, t, .025);
+        master.gain.setTargetAtTime(playing ? v * v * .75 : 0, t, .03);
+      }
+
+      function modulateFrame() {
+        if (ctx && playing) {
+          const t = ctx.currentTime;
+          if ($('humOscillate').checked) {
+            const h = currentValue('hum', t);
+            humGain.gain.setTargetAtTime(.11 * h, t, .025);
+            harmGain.gain.setTargetAtTime(.023 * h, t, .025);
+            $('humVal').value = Math.round(h * 100) + '% ↕';
+          }
+          if ($('warmthOscillate').checked) {
+            const w = currentValue('warmth', t);
+            lowpass.frequency.setTargetAtTime(warmthCutoff(w), t, .025);
+            $('warmthVal').value = Math.round(w * 100) + '% ↕';
+          }
+        }
+        requestAnimationFrame(modulateFrame);
+      }
+
+      // Inizializzazione della Web Audio API (Rumore bianco + Filtri + Oscillatori per il motore)
+      function setup() {
+        const C = window.AudioContext || window.webkitAudioContext;
+        if (!C) throw Error('Web Audio is not available in this browser.');
+        ctx = new C();
+        const buffer = ctx.createBuffer(2, ctx.sampleRate * 12, ctx.sampleRate);
+        for (let ch = 0; ch < 2; ch++) {
+          const arr = buffer.getChannelData(ch);
+          for (let i = 0; i < arr.length; i++) arr[i] = Math.random() * 2 - 1;
+        }
+        source = ctx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = true;
+        
+        highpass = ctx.createBiquadFilter(); highpass.type = 'highpass'; highpass.frequency.value = 65;
+        lowpass = ctx.createBiquadFilter(); lowpass.type = 'lowpass'; lowpass.frequency.value = 1750; lowpass.Q.value = .35;
+        airGain = ctx.createGain();
+        source.connect(highpass).connect(lowpass).connect(airGain);
+        
+        humOsc = ctx.createOscillator(); humOsc.type = 'sine'; humOsc.frequency.value = 100;
+        humGain = ctx.createGain(); humOsc.connect(humGain);
+        
+        harmonic = ctx.createOscillator(); harmonic.type = 'sine'; harmonic.frequency.value = 150;
+        harmGain = ctx.createGain(); harmonic.connect(harmGain);
+        
+        master = ctx.createGain(); master.gain.value = 0;
+        airGain.connect(master); humGain.connect(master); harmGain.connect(master);
+        master.connect(ctx.destination);
+        
+        source.start(); humOsc.start(); harmonic.start();
+      }
+
+      // Gestione eventi UI (Play/Pause, Slider, Modulazioni, Reset)
+      $('play').addEventListener('click', async () => {
+        try {
+          if (!ctx) setup();
+          await ctx.resume();
+          playing = !playing;
+          update();
+          $('play').textContent = playing ? 'Ⅱ Pause heater' : '▶ Play heater';
+          $('play').classList.toggle('active', playing);
+          $('status').textContent = playing ? '● Playing synthesized heater sound' : 'Paused';
+        } catch (e) {
+          $('status').textContent = 'Audio error: ' + e.message;
+        }
+      });
+
+      ids.forEach(id => $(id).addEventListener('input', update));
+
+      for (const id of Object.keys(mods)) {
+        $(id + 'Oscillate').addEventListener('change', () => { restartOscillation(id); update(); });
+        $(id + 'Random').addEventListener('click', () => { mods[id].random = !mods[id].random; restartOscillation(id); update(); });
+        $(id + 'Period').addEventListener('input', () => { restartOscillation(id); update(); });
+        for (const edge of ['Min', 'Max']) $(id + edge).addEventListener('input', () => {
+          const changed = +$(id + edge).value, other = edge === 'Min' ? 'Max' : 'Min';
+          if (edge === 'Min' && changed > +$(id + other).value) $(id + other).value = changed;
+          if (edge === 'Max' && changed < +$(id + other).value) $(id + other).value = changed;
+          update();
+        });
+        restartOscillation(id);
+      }
+
+      $('reset').addEventListener('click', () => {
+        Object.entries({ warmth: 86, fan: 75, hum: 84, volume: 85 }).forEach(([k, v]) => $(k).value = v);
+        for (const id of Object.keys(mods)) {
+          $(id + 'Oscillate').checked = false;
+          mods[id].random = false;
+          $(id + 'Period').value = 12;
+          $(id + 'Min').value = 70;
+          $(id + 'Max').value = 100;
+          restartOscillation(id);
+        }
+        update();
+      });
+
+      update();
+      modulateFrame();
+
+      // ========================================== -->
+      // ESPORTAZIONE FILE WAV (OFFLINE AUDIO)      -->
+      // ========================================== -->
+      function encodeWav(buffer) {
+        const channels = buffer.numberOfChannels, frames = buffer.length, bytesPerSample = 2;
+        const ab = new ArrayBuffer(44 + frames * channels * bytesPerSample), view = new DataView(ab);
+        const ascii = (offset, v) => { for (let i = 0; i < v.length; i++) view.setUint8(offset + i, v.charCodeAt(i)); };
+        ascii(0, 'RIFF'); view.setUint32(4, 36 + frames * channels * 2, true); ascii(8, 'WAVE');
+        ascii(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, channels, true);
+        view.setUint32(24, buffer.sampleRate, true); view.setUint32(28, buffer.sampleRate * channels * 2, true);
+        view.setUint16(32, channels * 2, true); view.setUint16(34, 16, true); ascii(36, 'data'); view.setUint32(40, frames * channels * 2, true);
+        const d = Array.from({ length: channels }, (_, c) => buffer.getChannelData(c)); let off = 44;
+        for (let i = 0; i < frames; i++) for (let c = 0; c < channels; c++) {
+          let v = Math.max(-1, Math.min(1, d[c][i])); view.setInt16(off, v < 0 ? v * 32768 : v * 32767, true); off += 2;
+        }
+        return new Blob([ab], { type: 'audio/wav' });
+      }
+
+      async function exportWav() {
+        const button = $('exportWav'); button.disabled = true; $('exportStatus').textContent = 'Rendering 30 seconds of audio…';
+        try {
+          const sampleRate = 44100, seconds = 30;
+          const O = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+          if (!O) throw new Error('OfflineAudioContext is unavailable in this browser');
+          const offline = new O(2, sampleRate * seconds, sampleRate);
+          const snapshot = Object.fromEntries(ids.map(k => [k, +$(k).value / 100]));
+          const exportMods = {};
+          for (const id of Object.keys(mods)) {
+            exportMods[id] = { on: $(id + 'Oscillate').checked, min: +$(id + 'Min').value / 100, max: +$(id + 'Max').value / 100, period: +$(id + 'Period').value, random: mods[id].random };
+            if (exportMods[id].on && exportMods[id].random) exportMods[id].segments = newRandomSegments(seconds);
+          }
+          function exportValue(id, t) {
+            const m = exportMods[id];
+            return !m.on ? snapshot[id] : m.min + (m.max - m.min) * modulationFraction(t, m.period, m.random, m.segments);
+          }
+          const buffer = offline.createBuffer(2, sampleRate * 12, sampleRate);
+          for (let ch = 0; ch < 2; ch++) {
+            const a = buffer.getChannelData(ch); for (let i = 0; i < a.length; i++) a[i] = Math.random() * 2 - 1;
+          }
+          const noise = offline.createBufferSource(); noise.buffer = buffer; noise.loop = true;
+          const hp = offline.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 65;
+          const lp = offline.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = warmthCutoff(exportValue("warmth", 0)); lp.Q.value = .35;
+          const air = offline.createGain(); air.gain.value = .34 * snapshot.fan;
+          noise.connect(hp).connect(lp).connect(air);
+          const osc1 = offline.createOscillator(); osc1.type = 'sine'; osc1.frequency.value = 100;
+          const g1 = offline.createGain(); g1.gain.value = .11 * snapshot.hum; osc1.connect(g1);
+          const osc2 = offline.createOscillator(); osc2.type = 'sine'; osc2.frequency.value = 150;
+          const g2 = offline.createGain(); g2.gain.value = .023 * snapshot.hum; osc2.connect(g2);
+          
+          for (let t = 0; t <= seconds; t += .02) {
+            if (exportMods.hum.on) { const h = exportValue('hum', t); g1.gain.setValueAtTime(.11 * h, t); g2.gain.setValueAtTime(.023 * h, t); }
+            if (exportMods.warmth.on) lp.frequency.setValueAtTime(warmthCutoff(exportValue('warmth', t)), t);
+          }
+          const out = offline.createGain(); out.gain.value = snapshot.volume * snapshot.volume * .75;
+          air.connect(out); g1.connect(out); g2.connect(out); out.connect(offline.destination);
+          
+          out.gain.setValueAtTime(0, 0); out.gain.linearRampToValueAtTime(snapshot.volume * snapshot.volume * .75, .04);
+          out.gain.setValueAtTime(snapshot.volume * snapshot.volume * .75, seconds - .06); out.gain.linearRampToValueAtTime(0, seconds);
+          noise.start(0); osc1.start(0); osc2.start(0);
+          
+          const rendered = await offline.startRendering();
+          const blob = encodeWav(rendered);
+          const url = URL.createObjectURL(blob), link = document.createElement('a'); link.href = url;
+          link.download = `hush-heater-30s-w${exportMods.warmth.on ? 'osc' + Math.round(exportMods.warmth.min * 100) + '-' + Math.round(exportMods.warmth.max * 100) : Math.round(snapshot.warmth * 100)}-a${Math.round(snapshot.fan * 100)}-h${exportMods.hum.on ? 'osc' + Math.round(exportMods.hum.min * 100) + '-' + Math.round(exportMods.hum.max * 100) : Math.round(snapshot.hum * 100)}-v${Math.round(snapshot.volume * 100)}.wav`;
+          document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 60000);
+          $('exportStatus').textContent = 'WAV exported — 30 seconds, 44.1 kHz, stereo 16-bit PCM. Active warmth and motor hum modulation included.';
+        } catch (e) {
+          $('exportStatus').textContent = 'Export failed: ' + e.message;
+        } finally {
+          button.disabled = false;
+        }
+      }
+      $('exportWav').addEventListener('click', exportWav);
+
+      // ========================================== -->
+      // VISUALIZZATORE CANVAS (ONDE AUDIO)         -->
+      // ========================================== -->
+      let cvs = $('wave'), g = cvs.getContext('2d');
+      function render() {
+        const dpr = window.devicePixelRatio || 1, w = cvs.width = Math.round(cvs.clientWidth * dpr), h = cvs.height = Math.round(cvs.clientHeight * dpr);
+        g.clearRect(0, 0, w, h);
+        g.strokeStyle = '#95cba5';
+        g.lineWidth = 1.5 * dpr;
+        g.beginPath();
+        const amp = playing ? (.12 + .32 * (+$('fan').value / 100)) : 0;
+        for (let x = 0; x < w; x += 2 * dpr) {
+          let y = h / 2 + (Math.random() - .5) * h * amp * 2;
+          if (!x) g.moveTo(x, y); else g.lineTo(x, y);
+        }
+        g.stroke();
+        raf = requestAnimationFrame(render);
+      }
+      render();
+	  
+	  
+	// Registrazione del Service Worker per la PWA
+	if ('serviceWorker' in navigator) {
+	  window.addEventListener('load', () => {
+		navigator.serviceWorker.register('./sw.js')
+		  .then((reg) => console.log('Service Worker registrato con successo:', reg.scope))
+		  .catch((err) => console.log('Registrazione Service Worker fallita:', err));
+	  });
+	}
+
+    </script>
+  </body>
+</html>
