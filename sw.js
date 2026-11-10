@@ -2,7 +2,7 @@ const CACHE_NAME = 'warm-heater-v1';
 const ASSETS_TO_CACHE = [
   './',
   './manifest.json',
-  './Sound_Generator.html'
+  "./index.html",
 ];
 
 // Installazione del Service Worker e salvataggio in cache dei file essenziali
