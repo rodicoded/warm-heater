@@ -1,5 +1,6 @@
 const CACHE_NAME = 'warm-heater-v1';
 const ASSETS_TO_CACHE = [
+  './',
   './manifest.json',
   './index.html'
 ];
